@@ -7,11 +7,13 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require("path");
+const serverless = require('serverless-http');
 
 const hostname = 'localhost';
 const port = 4000;
 
 const app = express();
+const router = express.Router();
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -75,8 +77,6 @@ app.get('/report/:id', (req, res) => {
   res.download(path.resolve(`${dir}/report.pdf`)); 
 })
 
-const server = http.createServer(app);
+app.use('/.netlify/functions/index', router);
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}`)
-})
+module.exports.handler = serverless(app);
