@@ -8,12 +8,12 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require("path");
 const serverless = require('serverless-http');
+const multer = require('multer');
 
 const hostname = 'localhost';
 const port = 4000;
 
 const app = express();
-const router = express.Router();
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -24,7 +24,6 @@ app.post('/text/:id', (req, res) => {
   const dir = './public/temp' + id.toString();
   const text = req.body.text;
 
-  fs.mkdirSync(dir);
   fs.writeFile(`${dir}/test.txt`, text, (err) => {
     if (err) {
       console.log(err);
@@ -48,7 +47,7 @@ app.get('/process/:id', (req, res) => {
   //   }
   // });  
 
-  const py = spawn("python", ["public/similarity.py", `${dir}/test.txt`, "public/test.xlsx"]);
+  const py = spawn("python", ["public/similarity_fast.py", `${dir}/test.txt`, `${dir}/database.xlsx`]);
   
   py.stdout.on('data', (data) => {
     console.log(`stdout: ${data}`);
@@ -65,7 +64,7 @@ app.get('/process/:id', (req, res) => {
       }
     });    
     res.download(path.resolve(`${dir}/report.pdf`)); 
-    fs.rmSync(dir, { recursive: true, force: true });
+    // fs.rmSync(dir, { recursive: true, force: true });
   });
  
 });
@@ -77,6 +76,40 @@ app.get('/report/:id', (req, res) => {
   res.download(path.resolve(`${dir}/report.pdf`)); 
 })
 
-app.use('/.netlify/functions/index', router);
+app.post('/database/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const dir = './public/temp' + id.toString();
+  fs.mkdirSync(dir);
 
-module.exports.handler = serverless(app);
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, dir)
+    },
+    filename: function (req, file, cb) {
+      cb(null, "database.xlsx" )
+    }
+  })
+
+  const upload = multer({ storage: storage }).single('file');
+
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(500).json(err)
+    } else if (err) {
+      return res.status(500).json(err)
+    }
+    return res.status(200).send(req.file)
+
+  })
+
+})
+
+app.get("/", (req, res) => {
+  res.send("This is the backend of the plagiarism checker")
+})
+
+const server = http.createServer(app);
+
+server.listen(process.env.PORT || port, () => {
+  console.log(`Server running at http://${hostname}:${port}`);
+})
